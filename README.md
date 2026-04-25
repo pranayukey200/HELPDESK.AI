@@ -1,3 +1,13 @@
+---
+title: AI Helpdesk API
+emoji: 🤖
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 <div align="center">
 
 <img src="https://img.shields.io/badge/HELPDESK.AI-111827?style=for-the-badge&logo=codeigniter&logoColor=10b981&labelColor=000000" height="60" alt="Logo">
