@@ -220,13 +220,21 @@ function Signup() {
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-6 py-12" style={{ fontFamily: "'Inter', sans-serif", background: 'linear-gradient(160deg, #f0fdf4 0%, #dcfce7 60%, #bbf7d0 100%)' }}>
       <div className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(34,160,69,0.12) 0%, transparent 70%)' }} />
 
+      {/* Back Button */}
+      <Link
+        to="/"
+        className="absolute top-8 left-8 flex items-center gap-2 transition-all group"
+        style={{ color: '#374151', fontWeight: 500, fontSize: '14px' }}
+        onMouseEnter={(e) => e.currentTarget.style.color = '#16a34a'}
+        onMouseLeave={(e) => e.currentTarget.style.color = '#374151'}
+      >
+        <div className="p-2 rounded-full transition-all" style={{ background: '#ffffff', border: '1px solid #e5e7eb' }}>
+          <ArrowLeft className="w-4 h-4" />
+        </div>
+        <span>Back to Home</span>
+      </Link>
+
       <div className="w-full max-w-md relative z-10">
-        {/* Back Button */}
-        <Link to="/" className="absolute -top-12 left-0 flex items-center gap-2 transition-all group" style={{ color: '#374151', fontWeight: 500, fontSize: '14px' }}
-          onMouseEnter={(e) => e.currentTarget.style.color = '#16a34a'} onMouseLeave={(e) => e.currentTarget.style.color = '#374151'}>
-          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-          <span>Back to Home</span>
-        </Link>
 
         {/* Logo Header */}
         <div className="flex justify-center mb-8">
