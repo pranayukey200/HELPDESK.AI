@@ -51,10 +51,15 @@ const CreateTicket = () => {
     const [voiceTranscript, setVoiceTranscript] = useState('');
     const [interimVoice, setInterimVoice] = useState('');
     const [isModelLoading, setIsModelLoading] = useState(false);
+    const [modelProgress, setModelProgress] = useState(0);
 
     // Web Worker & Audio Refs
     const workerRef = useRef(null);
     const audioContextRef = useRef(null);
+    const analyserRef = useRef(null);
+    const dataArrayRef = useRef(null);
+    const animationFrameRef = useRef(null);
+    const [visualizerData, setVisualizerData] = useState(new Array(16).fill(15));
     const streamRef = useRef(null);
     const processorRef = useRef(null);
     const audioDataRef = useRef([]);
@@ -67,6 +72,11 @@ const CreateTicket = () => {
             const msg = e.data;
             if (msg.type === 'ready') {
                 setIsModelLoading(false);
+                setModelProgress(100);
+            } else if (msg.type === 'progress') {
+                if (msg.status === 'progress') {
+                    setModelProgress(msg.progress);
+                }
             } else if (msg.type === 'result') {
                 setVoiceTranscript(msg.text);
             } else if (msg.type === 'error') {
@@ -78,6 +88,7 @@ const CreateTicket = () => {
         return () => {
             if (workerRef.current) workerRef.current.terminate();
             if (audioContextRef.current) audioContextRef.current.close();
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
         };
     }, []);
 
@@ -129,12 +140,40 @@ const CreateTicket = () => {
             audioContextRef.current = new AudioContext({ sampleRate: 16000 });
             
             const source = audioContextRef.current.createMediaStreamSource(stream);
+            
+            // Setup Visualizer
+            const analyser = audioContextRef.current.createAnalyser();
+            analyser.fftSize = 64; // Small FFT for simple visualization
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyserRef.current = analyser;
+            dataArrayRef.current = dataArray;
+            source.connect(analyser);
+
+            const updateVisualizer = () => {
+                if (!analyserRef.current) return;
+                analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+                
+                // Map frequency data to our 16 bars
+                const bars = [];
+                for (let i = 0; i < 16; i++) {
+                    // Average a small range of frequencies for each bar
+                    const val = dataArrayRef.current[i] || 0;
+                    const height = Math.max(5, (val / 255) * 50); // Scale to 5-55px
+                    bars.push(height);
+                }
+                setVisualizerData(bars);
+                animationFrameRef.current = requestAnimationFrame(updateVisualizer);
+            };
+            updateVisualizer();
+
             // 4096 buffer size gives us chunks of audio roughly every ~250ms
             const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
             
             audioDataRef.current = [];
             setIsModelLoading(true);
+            setModelProgress(0);
             workerRef.current.postMessage({ type: 'load' }); // Pre-load / warm-up model
             
             let lastSendTime = Date.now();
@@ -172,6 +211,10 @@ const CreateTicket = () => {
 
     const stopListening = () => {
         setIsListening(false);
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
         if (processorRef.current && audioContextRef.current) {
             processorRef.current.disconnect();
             audioContextRef.current.close();
@@ -621,10 +664,23 @@ const CreateTicket = () => {
 
                             <div className="p-8 min-h-[200px] max-h-[300px] overflow-y-auto relative">
                                 {isModelLoading && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10">
-                                        <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
-                                        <p className="text-emerald-700 font-bold text-sm">Loading Local AI Model...</p>
-                                        <p className="text-gray-400 text-xs mt-1 font-medium max-w-[200px] text-center">This runs entirely in your browser and will only take a moment the first time.</p>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10 p-8">
+                                        <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+                                        <p className="text-emerald-700 font-bold text-lg mb-2">Initializing Neural Voice AI...</p>
+                                        
+                                        <div className="w-full max-w-[280px] bg-gray-100 h-2.5 rounded-full overflow-hidden mb-3">
+                                            <motion.div 
+                                                className="bg-emerald-500 h-full"
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${modelProgress}%` }}
+                                                transition={{ duration: 0.3 }}
+                                            />
+                                        </div>
+                                        <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest">{Math.round(modelProgress)}% Downloaded</p>
+                                        
+                                        <p className="text-gray-400 text-xs mt-6 font-medium max-w-[240px] text-center leading-relaxed">
+                                            We're downloading a lightweight Whisper AI model directly to your browser for private, local transcription.
+                                        </p>
                                     </div>
                                 )}
                                 <p className="text-gray-800 text-lg leading-relaxed font-medium">
@@ -652,14 +708,13 @@ const CreateTicket = () => {
                                             <motion.div
                                                 key={i}
                                                 animate={{
-                                                    height: [15, 45, 15],
-                                                    backgroundColor: ['#34d399', '#10b981', '#34d399']
+                                                    height: visualizerData[i] || 15,
+                                                    backgroundColor: (visualizerData[i] || 15) > 30 ? '#10b981' : '#34d399'
                                                 }}
                                                 transition={{
-                                                    duration: 0.8,
-                                                    repeat: Infinity,
-                                                    delay: i * 0.05,
-                                                    ease: "easeInOut"
+                                                    type: 'spring',
+                                                    stiffness: 300,
+                                                    damping: 20
                                                 }}
                                                 className="w-1.5 rounded-full bg-emerald-400"
                                             />
