@@ -23,6 +23,8 @@ const AIProcessing = () => {
     const location = useLocation();
     const { text, image_text, image_base64 } = location.state || {};
     const setAITicket = useTicketStore((state) => state.setAITicket);
+    const { settings } = useAdminStore();
+    const { user, profile } = useAuthStore();
     const { showToast } = useToastStore();
     const hasCalledAPI = useRef(false);
     const [activeStep, setActiveStep] = useState(0);
@@ -43,8 +45,6 @@ const AIProcessing = () => {
                 // === Single call to backend — handles ML classification + Gemini summary ===
                 // Classification, NER, priority, team assignment, duplicate detection → local ML model
                 // Summary generation → backend Gemini service (no redundant frontend API call)
-                const { settings } = useAdminStore.getState();
-                const { user, profile } = useAuthStore.getState();
 
                 // ── Upload Image if present ──
                 let uploadedImageUrl = null;
@@ -191,7 +191,7 @@ const AIProcessing = () => {
 
         analyzeTicket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [text, image_text, image_base64, navigate, setAITicket]);
+    }, [text, image_text, image_base64, navigate, setAITicket, settings, user, profile]);
 
     return (
         <div className="flex-1 flex items-center justify-center p-6 bg-[#f6f8f7] min-h-screen relative overflow-hidden">
