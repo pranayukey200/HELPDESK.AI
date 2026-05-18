@@ -10,7 +10,6 @@ env/
 # We should probably only keep the ones we actually use if possible, 
 # but for now we'll just ignore the venv)
 # Models
-backend/models/
 backend/venv/
 
 # Logs and Data
