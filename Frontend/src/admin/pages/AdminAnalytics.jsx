@@ -23,7 +23,6 @@ const AdminAnalytics = () => {
 
     const fetchAnalytics = async () => {
         setLoading(true);
-        // removed setError
         try {
             let query = supabase.from('tickets').select('*');
             if (profile?.role === 'admin' && profile?.company) {
@@ -35,6 +34,7 @@ const AdminAnalytics = () => {
             setTickets(data || []);
         } catch (err) {
             console.error("Analytics fetch error:", err);
+        } finally {
             setLoading(false);
         }
     };
