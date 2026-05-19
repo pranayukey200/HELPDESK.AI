@@ -24,7 +24,7 @@ const AdminAnalytics = () => {
     const fetchAnalytics = async () => {
         setLoading(true);
         try {
-            let query = supabase.from('tickets').select('*');
+            let query = supabase.from('tickets').select('*, profiles(full_name, email)');
             if (profile?.role === 'admin' && profile?.company) {
                 query = query.eq('company', profile.company);
             }
@@ -97,7 +97,7 @@ const AdminAnalytics = () => {
         // 5. Live Activity Feed (Latest 10)
         const liveFeed = tickets.slice(0, 10).map(t => ({
             ticket_id: t.id,
-            user: t.user_id ? `User ${t.user_id.slice(0, 5)}` : (t.profiles?.full_name || 'Anonymous'),
+            user: t.profiles?.full_name || (t.user_id ? `User ${t.user_id.slice(0, 5)}` : 'Anonymous'),
             action: `Ticket ${t.status || 'Updated'}`,
             type: t.status === 'open' ? 'create' : t.status === 'resolved' ? 'resolve' : 'assign',
             timeFormatted: formatTimelineDate(t.created_at),
@@ -168,10 +168,10 @@ const AdminAnalytics = () => {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '26px', fontWeight: 800, color: '#0f1f12', margin: 0 }}>
-                        COMMAND CENTER
+                        Analytics
                     </h1>
                     <p style={{ fontSize: '11px', letterSpacing: '0.14em', color: '#9ca3af', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', textTransform: 'uppercase' }}>
-                        <Activity size={14} color="#16a34a" /> Intelligence Overview
+                        <Activity size={14} color="#16a34a" /> AI & System Insights
                     </p>
                 </div>
             </div>
@@ -179,30 +179,30 @@ const AdminAnalytics = () => {
             {/* Combined KPI Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
-                    label="Total Intelligence"
+                    label="Total Tickets"
                     value={stats.total}
-                    subtitle="System lifetime"
+                    subtitle="Lifetime generated"
                     icon={Layers}
                     color="slate"
                 />
                 <StatCard
                     label="AI Accuracy"
                     value={<span style={{ color: '#16a34a' }}>{aiStats.accuracyRate}%</span>}
-                    subtitle="Auto-classification rate"
+                    subtitle="Correct auto-classifications"
                     icon={Target}
                     color="emerald"
                 />
                 <StatCard
-                    label="Avg. CSAT Score"
+                    label="Average CSAT"
                     value={aiStats.avgCsatScore ? aiStats.avgCsatScore : <span style={{ color: '#9ca3af', fontSize: '24px' }}>No data</span>}
-                    subtitle="User satisfaction"
+                    subtitle="Customer satisfaction score"
                     icon={Star}
                     color="indigo"
                 />
                 <StatCard
                     label="High Priority"
                     value={<span style={{ color: '#dc2626' }}>{stats.highPriority}</span>}
-                    subtitle="Critical attention"
+                    subtitle="Tickets needing attention"
                     icon={AlertCircle}
                     color="red"
                 />
@@ -215,7 +215,8 @@ const AdminAnalytics = () => {
                     <div style={{ background: '#ffffff', borderRadius: '20px', border: '1px solid #f0fdf4', boxShadow: '0 2px 16px rgba(0,0,0,0.05)', padding: '24px' }}>
                         <div className="flex items-center justify-between mb-8">
                             <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700, color: '#0f1f12', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <LineChartIcon size={18} color="#22c55e" /> TICKET VOLUME (DAILY)
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" className="shrink-0"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                Daily Ticket Volume
                             </h3>
                         </div>
                         <div className="h-[300px] w-full">
@@ -246,7 +247,7 @@ const AdminAnalytics = () => {
                         <div style={{ background: '#ffffff', borderRadius: '20px', border: '1px solid #f0fdf4', boxShadow: '0 2px 16px rgba(0,0,0,0.05)', padding: '24px' }}>
                             <div className="mb-8">
                                 <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700, color: '#0f1f12', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Bot size={18} color="#22c55e" /> RESOLUTION FLOW
+                                    <Bot size={18} color="#22c55e" /> Resolution Status
                                 </h3>
                             </div>
                             <div className="h-[250px]">
@@ -272,7 +273,7 @@ const AdminAnalytics = () => {
                         <div style={{ background: '#ffffff', borderRadius: '20px', border: '1px solid #f0fdf4', boxShadow: '0 2px 16px rgba(0,0,0,0.05)', padding: '24px' }}>
                             <div className="mb-8">
                                 <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700, color: '#0f1f12', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <BarChart3 size={18} color="#22c55e" /> CATEGORY PULSE
+                                    <BarChart3 size={18} color="#22c55e" /> Tickets by Category
                                 </h3>
                             </div>
                             <div className="h-[250px]">
@@ -303,9 +304,9 @@ const AdminAnalytics = () => {
                     <Card className="p-8 border-none shadow-xl shadow-slate-200/50 rounded-[2rem] bg-white">
                         <div className="mb-8">
                             <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2 uppercase italic">
-                                <AlertCircle size={18} className="text-amber-500" /> AI Optimization Log
+                                <AlertCircle size={18} className="text-amber-500" /> AI Correction Log
                             </h3>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Categories requiring manual re-classification</p>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Categories with manual corrections</p>
                         </div>
                         <div className="h-[250px]">
                             {aiStats.misclassifiedCategories.length > 0 ? (
@@ -333,26 +334,26 @@ const AdminAnalytics = () => {
                     <div style={{ background: '#ffffff', borderRadius: '20px', border: '1px solid #f0fdf4', boxShadow: '0 2px 16px rgba(0,0,0,0.05)', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         <div style={{ background: '#0f1f12', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '15px', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, textTransform: 'uppercase' }}>
-                                <Activity size={16} color="#22c55e" /> LIVE SEQUENCE
+                                <Activity size={16} color="#22c55e" /> Recent Ticket Actions
                             </h3>
                             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
                         </div>
-                        <div className="overflow-y-auto custom-scrollbar flex-1 p-6" style={{ maxHeight: '1000px' }}>
+                        <div className="overflow-y-auto custom-scrollbar flex-1 p-6" style={{ maxHeight: '450px' }}>
                             {stats.liveFeed.length > 0 ? (
                                 stats.liveFeed.map((event, idx) => {
                                     let badgeStyle = { background: '#fef3c7', color: '#d97706' }; // Default amber
-                                    let badgeText = 'PENDING_HUMAN';
+                                    let badgeText = 'Escalated';
                                     if (event.action.toLowerCase().includes('resolve')) {
                                         if (event.action.toLowerCase().includes('auto')) {
                                             badgeStyle = { background: '#dbeafe', color: '#2563eb' }; // blue pill for auto
-                                            badgeText = 'AUTO_RESOLVED';
+                                            badgeText = 'AI Resolved';
                                         } else {
                                             badgeStyle = { background: '#dcfce7', color: '#15803d' }; // green pill for human resolved
-                                            badgeText = 'RESOLVED';
+                                            badgeText = 'Resolved';
                                         }
                                     } else if (event.type === 'create') {
                                         badgeStyle = { background: '#fef9c3', color: '#ca8a04' }; // yellow pill for created/open
-                                        badgeText = 'OPEN';
+                                        badgeText = 'Open';
                                     }
 
                                     return (
