@@ -85,7 +85,8 @@ class TicketSaveRequest(BaseModel):
     is_duplicate: bool
     confidence: float
     image_url: str | None = None
-    company: str
+    company: str | None = None
+    company_id: str | None = None
     sla_breach_at: str
     metadata: dict
     entities: list = []
@@ -514,6 +515,25 @@ async def save_ticket(request_body: TicketSaveRequest):
 
     try:
         final_data = request_body.dict()
+
+        # Backfill tenant id from user profile when client payload omits it.
+        if not final_data.get("company_id") and request_body.user_id:
+            try:
+                profile_res = (
+                    supabase.table("profiles")
+                    .select("company_id, company")
+                    .eq("id", request_body.user_id)
+                    .single()
+                    .execute()
+                )
+                profile = profile_res.data or {}
+                if profile.get("company_id"):
+                    final_data["company_id"] = profile["company_id"]
+                if not final_data.get("company") and profile.get("company"):
+                    final_data["company"] = profile["company"]
+            except Exception as profile_error:
+                print(f"[WARNING] Failed to resolve company_id from profile: {profile_error}")
+
         res = supabase.table("tickets").insert(final_data).execute()
         
         if not res.data:

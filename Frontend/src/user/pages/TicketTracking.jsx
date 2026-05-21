@@ -52,6 +52,7 @@ const TicketTracking = () => {
                     confidence: aiTicket.confidence,
                     image_url: aiTicket.image_url || null,
                     company: profile?.company || "System",
+                    company_id: profile?.company_id || null,
                     sla_breach_at: aiTicket.sla_breach_at,
                     metadata: {
                         confidence: aiTicket.confidence,
