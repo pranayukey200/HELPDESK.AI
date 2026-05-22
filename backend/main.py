@@ -11,6 +11,8 @@ import json
 import datetime
 import traceback
 import warnings
+import logging
+import hashlib
 from contextlib import asynccontextmanager
 
 # Suppress harmless PyTorch CPU pin_memory warning
@@ -85,7 +87,8 @@ class TicketSaveRequest(BaseModel):
     is_duplicate: bool
     confidence: float
     image_url: str | None = None
-    company: str
+    company: str | None = None
+    company_id: str | None = None
     sla_breach_at: str
     metadata: dict
     entities: list = []
@@ -512,8 +515,54 @@ async def save_ticket(request_body: TicketSaveRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase connection not initialized.")
 
+    logger = logging.getLogger(__name__)
     try:
         final_data = request_body.dict()
+
+        # Resolve tenant linkage from user profile with authorization validation.
+        profile = {}
+        if request_body.user_id:
+            try:
+                profile_res = (
+                    supabase.table("profiles")
+                    .select("company_id, company")
+                    .eq("id", request_body.user_id)
+                    .single()
+                    .execute()
+                )
+                profile = profile_res.data or {}
+                if not profile:
+                    raise HTTPException(status_code=404, detail="User profile not found")
+            except HTTPException:
+                raise
+            except Exception as profile_error:
+                user_hash = hashlib.sha256(str(request_body.user_id).encode()).hexdigest()[:8]
+                logger.error(f"Tenant resolution error for user {user_hash}: {profile_error}")
+                raise HTTPException(status_code=503, detail="Failed to resolve tenant linkage") from profile_error
+
+        # Validate tenant consistency and authorization.
+        profile_company_id = profile.get("company_id")
+        if final_data.get("company_id"):
+            # User provided company_id: verify it matches their profile.
+            if profile_company_id and final_data["company_id"] != profile_company_id:
+                user_hash = hashlib.sha256(str(request_body.user_id).encode()).hexdigest()[:8]
+                logger.warning(f"Tenant mismatch: user {user_hash} attempted {final_data['company_id']}, assigned to {profile_company_id}")
+                raise HTTPException(status_code=403, detail="User not authorized for this tenant")
+        elif profile_company_id:
+            # Backfill company_id from profile.
+            final_data["company_id"] = profile_company_id
+        elif request_body.user_id:
+            # User has no tenant assignment.
+            raise HTTPException(status_code=400, detail="User has no tenant assignment")
+
+        # Backfill company name if missing.
+        if not final_data.get("company") and profile.get("company"):
+            final_data["company"] = profile["company"]
+
+        user_hash = hashlib.sha256(str(request_body.user_id).encode()).hexdigest()[:8]
+        logger.info(f"Tenant linkage: user_hash={user_hash}, company_id={final_data.get('company_id')}")
+
+
         res = supabase.table("tickets").insert(final_data).execute()
         
         if not res.data:
