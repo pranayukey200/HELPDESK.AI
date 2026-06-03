@@ -60,6 +60,7 @@ from backend.services.ner_service import NERService
 from backend.services.duplicate_service import DuplicateService
 from backend.services.rag_service import RagService
 from backend.services.gdpr_service import GDPRService
+from backend.services.notification_queue import load as load_notification_queue, NotificationQueue, NotificationStatus
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +201,7 @@ ner_service = NERService()
 duplicate_service = DuplicateService()
 rag_service = RagService()
 gdpr_service = GDPRService(supabase)
+notification_queue = load_notification_queue(supabase)
 
 try:
     from backend.services.gemini_service import GeminiService
@@ -738,6 +740,81 @@ async def request_deletion(request: DeletionRequestRequest):
 async def get_privacy_requests(user_id: str):
     """Get all privacy requests for a user."""
     return {"requests": gdpr_service.get_privacy_requests(user_id)}
+
+
+# ---------------------------------------------------------------------------
+# Notification Queue Endpoints
+# ---------------------------------------------------------------------------
+class EnqueueNotificationRequest(BaseModel):
+    type: str
+    payload: dict
+    scheduled_at: str | None = None
+    max_attempts: int = 5
+
+
+class UpdateNotificationStatusRequest(BaseModel):
+    status: str
+    error_message: str | None = None
+
+
+@app.post("/notifications/enqueue")
+async def enqueue_notification(request: EnqueueNotificationRequest):
+    """Add a new notification to the persistent queue."""
+    try:
+        notification = notification_queue.enqueue(
+            notification_type=request.type,
+            payload=request.payload,
+            scheduled_at=request.scheduled_at,
+            max_attempts=request.max_attempts
+        )
+        return {"success": True, "notification": notification}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/notifications/dequeue")
+async def dequeue_notifications(limit: int = 10):
+    """Get next pending notifications for processing."""
+    try:
+        notifications = notification_queue.dequeue(limit=limit)
+        return {"success": True, "notifications": notifications}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/notifications/{notification_id}/status")
+async def update_notification_status(notification_id: str, request: UpdateNotificationStatusRequest):
+    """Update the status of a notification (e.g., sent, failed, etc.)."""
+    try:
+        status = NotificationStatus(request.status)
+        notification_queue.update_status(
+            notification_id=notification_id,
+            status=status,
+            error_message=request.error_message
+        )
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/notifications/failed")
+async def get_failed_notifications(limit: int = 50):
+    """Get failed notifications that can be retried."""
+    try:
+        notifications = notification_queue.get_failed(limit=limit)
+        return {"success": True, "notifications": notifications}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/notifications/{notification_id}/retry")
+async def retry_notification(notification_id: str):
+    """Mark a failed notification as pending to retry it."""
+    try:
+        notification_queue.retry_failed(notification_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
