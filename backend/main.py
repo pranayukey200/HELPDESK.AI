@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 warnings.filterwarnings("ignore", message="'pin_memory'")
 
 # HF Rebuild Trigger: 2026-03-08-2030
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -58,6 +58,7 @@ from backend.services.classifier_v2 import classifier_v2
 from backend.services.classifier_v3 import classifier_v3 # V3 Power Model
 from backend.services.ner_service import NERService
 from backend.services.duplicate_service import DuplicateService
+from backend.services.enterprise_auth_service import EnterpriseAuthService
 from backend.services.rag_service import RagService
 
 
@@ -198,6 +199,7 @@ classifier_service = ClassifierService()
 ner_service = NERService()
 duplicate_service = DuplicateService()
 rag_service = RagService()
+enterprise_auth_service = EnterpriseAuthService(supabase)
 
 try:
     from backend.services.gemini_service import GeminiService
@@ -1069,6 +1071,79 @@ async def analyze_ticket_v2(request: TicketRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------------------------------------------------------------------
+# Enterprise Authentication Suite
+# ---------------------------------------------------------------------------
+class EnterpriseSSOProvider(BaseModel):
+    id: str
+    name: str
+    protocol: str
+    providerType: str
+    enabled: bool = False
+    clientId: str = ""
+    clientSecretConfigured: bool = False
+    discoveryUrl: str = ""
+    metadataUrl: str = ""
+    domainHint: str = ""
+    buttonLabel: str = ""
+    supabaseProvider: str | None = None
+
+
+class EnterpriseRoleMapping(BaseModel):
+    id: str
+    externalGroup: str
+    role: str
+    scope: str = "requester_access"
+
+
+class EnterpriseSSOConfig(BaseModel):
+    enabled: bool = False
+    allowEmailPasswordFallback: bool = True
+    allowMagicLinkFallback: bool = True
+    jitProvisioning: bool = True
+    groupSyncEnabled: bool = True
+    nestedGroupsEnabled: bool = False
+    defaultRole: str = "user"
+    sessionTimeoutMinutes: int = 480
+    provisioningWebhookSecret: str = ""
+    providers: list[EnterpriseSSOProvider] = []
+    roleMappings: list[EnterpriseRoleMapping] = []
+
+
+class EnterpriseSSOConfigPayload(BaseModel):
+    companyId: str | None = None
+    actor: str = "admin"
+    config: EnterpriseSSOConfig
+
+
+class EnterpriseSSOProviderTestPayload(BaseModel):
+    companyId: str | None = None
+    providerId: str
+
+
+@app.get("/admin/sso/config")
+async def get_enterprise_sso_config(company_id: str | None = None):
+    return enterprise_auth_service.get_config(company_id)
+
+
+@app.put("/admin/sso/config")
+async def save_enterprise_sso_config(payload: EnterpriseSSOConfigPayload):
+    return enterprise_auth_service.save_config(
+        payload.companyId,
+        payload.config.model_dump(),
+        actor=payload.actor,
+    )
+
+
+@app.post("/admin/sso/test")
+async def test_enterprise_sso_provider(payload: EnterpriseSSOProviderTestPayload):
+    return enterprise_auth_service.test_provider(payload.companyId, payload.providerId)
+
+
+@app.get("/admin/sso/providers")
+async def list_enterprise_login_providers(company_id: str | None = None):
+    return {"providers": enterprise_auth_service.get_login_providers(company_id)}
+
+
 # Clean cookie-based Supabase Auth endpoints for /auth/me backward-compatibility
 # ---------------------------------------------------------------------------
 ACCESS_COOKIE = "access_token"

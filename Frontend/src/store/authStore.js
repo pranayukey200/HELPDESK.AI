@@ -155,6 +155,34 @@ const useAuthStore = create(
                 }
             },
 
+            signInWithEnterpriseProvider: async (provider, options = {}) => {
+                set({ loading: true });
+                try {
+                    const redirectTo = options.redirectTo || `${window.location.origin}/login`;
+                    const queryParams = {};
+
+                    if (options.domainHint) {
+                        queryParams.hd = options.domainHint;
+                    }
+
+                    const { error } = await supabase.auth.signInWithOAuth({
+                        provider,
+                        options: {
+                            redirectTo,
+                            ...(Object.keys(queryParams).length ? { queryParams } : {}),
+                        }
+                    });
+
+                    if (error) throw error;
+                    return true;
+                } catch (error) {
+                    console.error("Enterprise OAuth failed:", error.message);
+                    throw error;
+                } finally {
+                    set({ loading: false });
+                }
+            },
+
             verifyOtpAndLogin: async (email, token, type = 'magiclink') => {
                 set({ loading: true });
                 console.log("Attempting OTP verification for:", email);

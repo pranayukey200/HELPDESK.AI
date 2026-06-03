@@ -74,6 +74,7 @@ const createDisabledSupabaseClient = () => ({
 			},
 		}),
 		signInWithPassword: async () => ({ data: { user: null, session: null }, error: makeDisabledError() }),
+		signInWithOAuth: async () => ({ data: null, error: makeDisabledError() }),
 		signUp: async () => ({ data: { user: null, session: null }, error: makeDisabledError() }),
 		signOut: async () => ({ error: null }),
 		resetPasswordForEmail: async () => ({ data: null, error: makeDisabledError() }),

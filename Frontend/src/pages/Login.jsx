@@ -1,21 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
  
 import { motion } from "framer-motion";
 import useAuthStore from "../store/authStore";
-import { Eye, EyeOff, BrainCircuit, ArrowRight, Loader2, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, BrainCircuit, ArrowRight, Loader2, ArrowLeft, Building2 } from "lucide-react";
+import { enterpriseAuthService } from "../admin/services/enterpriseAuthService";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [enterpriseProviders, setEnterpriseProviders] = useState([]);
+  const [loadingEnterpriseProviders, setLoadingEnterpriseProviders] = useState(true);
 
   const [isMagicLink, setIsMagicLink] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const navigate = useNavigate();
-  const { login, signInWithMagicLink, loading, user, profile } = useAuthStore();
+  const { login, signInWithMagicLink, signInWithEnterpriseProvider, loading, user, profile } = useAuthStore();
 
   // Auto-redirect if already logged in
   useEffect(() => {
@@ -32,6 +35,36 @@ function Login() {
       }
     }
   }, [user, profile, navigate]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadProviders = async () => {
+      const providers = await enterpriseAuthService.getLoginProviders("default-company");
+      if (!ignore) {
+        setEnterpriseProviders(providers);
+        setLoadingEnterpriseProviders(false);
+      }
+    };
+
+    loadProviders();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const visibleEnterpriseProviders = useMemo(() => {
+    const emailDomain = email.includes("@") ? email.split("@")[1].trim().toLowerCase() : "";
+    if (!emailDomain) return enterpriseProviders;
+
+    const matching = enterpriseProviders.filter((provider) => {
+      const hint = (provider.domainHint || "").trim().toLowerCase();
+      return hint && emailDomain.includes(hint);
+    });
+
+    return matching.length > 0 ? matching : enterpriseProviders;
+  }, [email, enterpriseProviders]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -93,6 +126,22 @@ function Login() {
       let errMsg = err.message || "Failed to send magic link. Please check your email.";
       if (errMsg.toLowerCase().includes("failed to fetch")) {
         errMsg = "Network Error: Failed to fetch. This usually happens if your browser's ad-blocker (like Brave Shields, uBlock Origin, etc.) is blocking Supabase requests. Please try disabling your ad-blocker for this site and refresh!";
+      }
+      setError(errMsg);
+    }
+  };
+
+  const handleEnterpriseLogin = async (provider) => {
+    setError("");
+    try {
+      await signInWithEnterpriseProvider(provider.supabaseProvider, {
+        domainHint: provider.domainHint,
+        redirectTo: `${window.location.origin}/login`,
+      });
+    } catch (err) {
+      let errMsg = err.message || "Enterprise sign-in could not be started.";
+      if (errMsg.toLowerCase().includes("failed to fetch")) {
+        errMsg = "Network Error: Failed to fetch. This usually happens if your browser's ad-blocker is blocking Supabase requests. Please disable it for this site and refresh.";
       }
       setError(errMsg);
     }
@@ -353,6 +402,52 @@ function Login() {
                 <span className="flex-shrink-0 mx-4" style={{ color: '#9ca3af', fontSize: '13px', fontWeight: 500 }}>Or</span>
                 <div className="flex-grow" style={{ borderTop: '1px solid #e5e7eb' }}></div>
               </div>
+
+              {loadingEnterpriseProviders ? (
+                <div className="flex items-center justify-center gap-2 py-2" style={{ color: '#6b7280', fontSize: '13px', fontWeight: 600 }}>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading enterprise providers...
+                </div>
+              ) : visibleEnterpriseProviders.length > 0 && (
+                <div
+                  className="space-y-3 rounded-2xl"
+                  style={{ border: '1px solid #d1fae5', background: '#f8fffb', padding: '16px' }}
+                >
+                  <div>
+                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Enterprise SSO
+                    </p>
+                    <p style={{ color: '#6b7280', fontSize: '13px', marginTop: '6px' }}>
+                      Use your company identity provider to sign in with corporate credentials.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {visibleEnterpriseProviders.map((provider) => (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        onClick={() => handleEnterpriseLogin(provider)}
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-2 transition-all"
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #bbf7d0',
+                          color: '#166534',
+                          borderRadius: '12px',
+                          padding: '13px',
+                          fontWeight: 600,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Building2 className="w-4 h-4" />
+                        {provider.buttonLabel || `Continue with ${provider.name}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Magic Link Toggle */}
               <button
