@@ -485,6 +485,22 @@ const Profile = () => {
                                             <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-600 transition-all" />
                                         </button>
 
+                                        <button
+                                            onClick={() => navigate('/privacy')}
+                                            className="w-full p-8 flex items-center justify-between hover:bg-emerald-50 transition-all group border-t border-slate-50"
+                                        >
+                                            <div className="flex items-center gap-6">
+                                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-sm">
+                                                    <ShieldCheck size={20} />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-sm font-black text-emerald-700 uppercase italic tracking-tight">Privacy & Data</p>
+                                                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Manage consent, export, or delete your data</p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-emerald-200 group-hover:text-emerald-600 transition-all" />
+                                        </button>
+
                                         {/* Bug Report Custom Trigger */}
                                         <BugReportWidget
                                             advanced={true}

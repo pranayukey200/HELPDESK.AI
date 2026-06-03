@@ -39,6 +39,7 @@ import CreateTicket from "./user/pages/CreateTicket";
 import MyTickets from "./user/pages/MyTickets";
 import TicketResult from "./user/pages/TicketResult";
 import Profile from "./user/pages/Profile";
+import PrivacySettings from "./user/pages/PrivacySettings";
 import TicketDetail from "./user/pages/TicketDetail";
 import TicketProcessing from "./user/pages/AIProcessing"; // Renamed generic import just in case, but keeping AIProcessing
 import AIProcessing from "./user/pages/AIProcessing";
@@ -118,6 +119,7 @@ function TitleUpdater() {
     else if (path === '/create-ticket') title = 'Create Ticket';
     else if (path === '/my-tickets') title = 'My Tickets';
     else if (path === '/profile') title = 'User Profile';
+    else if (path === '/privacy') title = 'Privacy & Data Controls';
     else if (path === '/notifications') title = 'Notifications';
     else if (path === '/docs') title = 'Documentation';
     else if (path === '/api-reference') title = 'API Reference';
@@ -191,6 +193,7 @@ function AppLayout() {
           <Route path="/ticket-tracking" element={<TicketTracking />} />
           <Route path="/ticket-result" element={<TicketResult />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/privacy" element={<PrivacySettings />} />
           <Route path="/help" element={<Help />} />
           <Route path="/notifications" element={<Notifications />} />
         </Route>

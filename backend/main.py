@@ -59,6 +59,7 @@ from backend.services.classifier_v3 import classifier_v3 # V3 Power Model
 from backend.services.ner_service import NERService
 from backend.services.duplicate_service import DuplicateService
 from backend.services.rag_service import RagService
+from backend.services.gdpr_service import GDPRService
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +199,7 @@ classifier_service = ClassifierService()
 ner_service = NERService()
 duplicate_service = DuplicateService()
 rag_service = RagService()
+gdpr_service = GDPRService(supabase)
 
 try:
     from backend.services.gemini_service import GeminiService
@@ -689,6 +691,53 @@ async def update_ticket(ticket_id: str, updates: dict):
             return updated_ticket
     
     raise HTTPException(status_code=404, detail="Ticket not found")
+
+
+# ---------------------------------------------------------------------------
+# Privacy Controls & GDPR Compliance Endpoints
+# ---------------------------------------------------------------------------
+class ConsentUpdateRequest(BaseModel):
+    user_id: str
+    consent: dict
+    actor: str = "user"
+
+
+class DeletionRequestRequest(BaseModel):
+    user_id: str
+    reason: str = ""
+
+
+@app.get("/privacy/consent")
+async def get_consent(user_id: str):
+    """Fetch current user consent preferences."""
+    return gdpr_service.get_consent(user_id)
+
+
+@app.put("/privacy/consent")
+async def update_consent(request: ConsentUpdateRequest):
+    """Update user consent preferences with audit logging."""
+    return gdpr_service.update_consent(request.user_id, request.consent, request.actor)
+
+
+@app.get("/privacy/export")
+async def export_data(user_id: str, format: str = "json"):
+    """Export user's personal data in JSON or CSV format."""
+    data = gdpr_service.export_data(user_id, format)
+    if format == "csv":
+        return Response(content=data, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=user_data_{user_id}.csv"})
+    return Response(content=data, media_type="application/json", headers={"Content-Disposition": f"attachment; filename=user_data_{user_id}.json"})
+
+
+@app.post("/privacy/request_deletion")
+async def request_deletion(request: DeletionRequestRequest):
+    """Submit a data deletion request."""
+    return gdpr_service.request_deletion(request.user_id, request.reason)
+
+
+@app.get("/privacy/requests")
+async def get_privacy_requests(user_id: str):
+    """Get all privacy requests for a user."""
+    return {"requests": gdpr_service.get_privacy_requests(user_id)}
 
 
 # ---------------------------------------------------------------------------
