@@ -6,6 +6,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import { DOCS_CATEGORIES, DOCS_ARTICLES } from '../data/docsArticles';
 import { Card } from '../../components/ui/card';
 
@@ -223,6 +224,7 @@ const DocsPortal = () => {
                                 {/* Custom Premium Markdown rendering */}
                                 <ReactMarkdown 
                                     remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeSanitize]}
                                     components={{
                                         h1: ({node, ...props}) => <h2 className="text-2xl font-black text-gray-900 tracking-tight mt-2 mb-6 border-b border-gray-100 pb-3" {...props} />,
                                         h2: ({node, ...props}) => <h3 className="text-lg font-bold text-gray-800 tracking-tight mt-6 mb-3" {...props} />,

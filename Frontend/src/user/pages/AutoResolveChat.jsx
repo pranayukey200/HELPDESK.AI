@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 import useTicketStore from '../../store/ticketStore';
 import { Card, CardContent } from "../../components/ui/card";
 import { askAI } from '../../services/aiAssistant';
@@ -281,6 +282,7 @@ const AutoResolveChat = () => {
                                                 {msg.role === 'bot' ? (
                                                     <ReactMarkdown
                                                         remarkPlugins={[remarkGfm]}
+                                                        rehypePlugins={[rehypeSanitize]}
                                                         components={{
                                                             ul: ({ ...props }) => <ul className="list-disc ml-4 space-y-2 mb-3" {...props} />,
                                                             ol: ({ ...props }) => <ol className="list-decimal ml-4 space-y-2 mb-3" {...props} />,
