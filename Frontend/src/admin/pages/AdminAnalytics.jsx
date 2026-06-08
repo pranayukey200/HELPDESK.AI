@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, RadialBarChart, RadialBar
@@ -20,6 +20,7 @@ const AdminAnalytics = () => {
     const { profile } = useAuthStore();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const mountedRef = useRef(true);
 
     const fetchAnalytics = async () => {
         setLoading(true);
@@ -45,22 +46,31 @@ const AdminAnalytics = () => {
                     .eq('company', profile?.company)
                     .order('created_at', { ascending: false });
                 if (basicError) throw basicError;
-                setTickets(basicData || []);
+                if (mountedRef.current) {
+                    setTickets(basicData || []);
+                }
             } else {
-                setTickets(data || []);
+                if (mountedRef.current) {
+                    setTickets(data || []);
+                }
             }
         } catch (err) {
             console.error("Analytics fetch error:", err);
         } finally {
-            setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         if (profile) {
             fetchAnalytics();
         }
-     
+        return () => {
+            mountedRef.current = false;
+        };
     }, [profile]);
 
     const stats = useMemo(() => {

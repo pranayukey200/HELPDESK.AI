@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, ChevronRight, Inbox, Loader2, AlertCircle } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
@@ -11,10 +11,13 @@ const RecentTickets = () => {
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const mountedRef = useRef(true);
 
     const fetchRecentTickets = async () => {
         if (!user?.id) {
-            setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
             return;
         }
 
@@ -29,18 +32,27 @@ const RecentTickets = () => {
                 .limit(5);
 
             if (sbError) throw sbError;
-            setTickets(data || []);
+            if (mountedRef.current) {
+                setTickets(data || []);
+            }
         } catch (err) {
             console.error("Error fetching recent tickets:", err);
-            setError(err.message);
+            if (mountedRef.current) {
+                setError(err.message);
+            }
         } finally {
-            setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchRecentTickets();
-     
+        return () => {
+            mountedRef.current = false;
+        };
     }, []);
 
     const getStatusBadge = (status) => {
