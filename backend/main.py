@@ -59,6 +59,7 @@ from backend.services.classifier_v3 import classifier_v3 # V3 Power Model
 from backend.services.ner_service import NERService
 from backend.services.duplicate_service import DuplicateService
 from backend.services.rag_service import RagService
+from backend.services.sentiment_service import SentimentService
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +114,11 @@ class TicketSaveRequest(BaseModel):
     ocr_text: str = ""
     needs_review: bool = False
     routing_confidence: float
+    # Sentiment analysis fields
+    sentiment: str = "neutral"
+    sentiment_confidence: float = 0.5
+    frustration_score: float = 0.0
+    churn_risk: float = 0.0
 
 
 class DuplicateInfo(BaseModel):
@@ -150,6 +156,11 @@ class TicketResponse(BaseModel):
     env_metadata: dict = {} # IP, Hostname, Browser/OS
     sla_breach_at: str | None = None
     version: str = "2.1.0-Neural-Diagnostic"
+    # Sentiment analysis fields
+    sentiment: str = "neutral"
+    sentiment_confidence: float = 0.5
+    frustration_score: float = 0.0
+    churn_risk: float = 0.0
 
 
 # --- Persistence Models ---
@@ -198,6 +209,7 @@ classifier_service = ClassifierService()
 ner_service = NERService()
 duplicate_service = DuplicateService()
 rag_service = RagService()
+sentiment_service = SentimentService()
 
 try:
     from backend.services.gemini_service import GeminiService
@@ -235,6 +247,10 @@ async def lifespan(app: FastAPI):
         rag_service.load()
     except Exception as e:
         print(f"[WARNING] RAG service not loaded: {e}")
+    try:
+        sentiment_service.load()
+    except Exception as e:
+        print(f"[WARNING] Sentiment service not loaded: {e}")
     
     if gemini_service:
         print(f"[Startup] Gemini Service: {'Initialized' if gemini_service._initialized else 'FAILED (Key missing or SDK error)'}")
@@ -773,6 +789,22 @@ async def analyze_only(request_body: TicketRequest):
 
     summary = text[:100] + ("…" if len(text) > 100 else "") 
 
+    # --- Sentiment Analysis ---
+    try:
+        sentiment_result = sentiment_service.analyze(text)
+    except Exception as e:
+        print(f"[Sentiment Analysis Error] {e}")
+        sentiment_result = {
+            "sentiment": "neutral",
+            "confidence": 0.5,
+            "frustration_score": 0.0,
+            "churn_risk": 0.0
+        }
+    
+    # If high churn risk, auto-escalate priority
+    if sentiment_result.get("churn_risk", 0.0) > 0.7:
+        decision_factors.append(f"High churn risk detected ({int(sentiment_result['churn_risk']*100)}%)")
+    
     # --- Classification ---
     try:
         classification_v3_res = classifier_v3.predict(text)
@@ -888,7 +920,12 @@ async def analyze_only(request_body: TicketRequest):
         highlights=entities, # Use entities as highlights for now
         timeline=timeline,
         env_metadata=env_metadata,
-        sla_breach_at=sla_breach_dt.isoformat() + "Z"
+        sla_breach_at=sla_breach_dt.isoformat() + "Z",
+        # Sentiment analysis results
+        sentiment=sentiment_result["sentiment"],
+        sentiment_confidence=sentiment_result["confidence"],
+        frustration_score=sentiment_result["frustration_score"],
+        churn_risk=sentiment_result["churn_risk"]
     )
 
 @app.post("/ai/analyze_stream")
@@ -926,6 +963,23 @@ async def analyze_stream(request_body: TicketRequest):
                 pass
 
         summary = text[:100] + ("…" if len(text) > 100 else "") 
+
+        # 1.5 Sentiment Analysis
+        yield f"data: {json.dumps({'step': 'Analyzing customer sentiment', 'status': 'in_progress'})}\n\n"
+        await asyncio.sleep(0.2)
+        try:
+            sentiment_result = sentiment_service.analyze(text)
+        except Exception as e:
+            print(f"[Sentiment Analysis Stream Error] {e}")
+            sentiment_result = {
+                "sentiment": "neutral",
+                "confidence": 0.5,
+                "frustration_score": 0.0,
+                "churn_risk": 0.0
+            }
+        
+        if sentiment_result.get("churn_risk", 0.0) > 0.7:
+            decision_factors.append(f"High churn risk detected ({int(sentiment_result['churn_risk']*100)}%)")
 
         # 2. NER
         yield f"data: {json.dumps({'step': 'Extracting technical entities', 'status': 'in_progress'})}\n\n"
@@ -1035,7 +1089,12 @@ async def analyze_stream(request_body: TicketRequest):
             "highlights": entities,
             "timeline": timeline,
             "env_metadata": env_metadata,
-            "sla_breach_at": sla_breach_dt.isoformat() + "Z"
+            "sla_breach_at": sla_breach_dt.isoformat() + "Z",
+            # Sentiment analysis results
+            "sentiment": sentiment_result["sentiment"],
+            "sentiment_confidence": sentiment_result["confidence"],
+            "frustration_score": sentiment_result["frustration_score"],
+            "churn_risk": sentiment_result["churn_risk"]
         }
 
         # 6. Final Result
