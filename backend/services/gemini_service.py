@@ -222,3 +222,52 @@ class GeminiService:
         except Exception as e:
             print(f"[GeminiService] Bug Analysis Error: {e}")
             return f"Diagnostic analysis failed: {str(e)}"
+
+    def summarize_transcript(self, messages: list[dict]) -> dict:
+        """
+        Summarize a support ticket conversation/transcript.
+        Returns summary, key issues, resolution status, and next steps.
+        """
+        if not self._initialized:
+            return {
+                "summary": "AI summarization unavailable.",
+                "key_issues": [],
+                "resolution_status": "unknown",
+                "next_steps": []
+            }
+        
+        try:
+            # Format messages for the prompt
+            transcript_str = ""
+            for msg in messages:
+                role = msg.get("sender_name", msg.get("role", "Unknown"))
+                text = msg.get("message", msg.get("text", ""))
+                transcript_str += f"{role}: {text}\n"
+            
+            prompt = (
+                f"You are an expert IT support manager analyzing a support ticket conversation.\n"
+                f"Transcript:\n{transcript_str}\n\n"
+                "Please analyze and return the following in JSON format:\n"
+                "1. 'summary': A concise 2-3 sentence summary of the entire conversation\n"
+                "2. 'key_issues': A list of 2-4 key problems discussed (short bullet points)\n"
+                "3. 'resolution_status': One of: 'resolved', 'in_progress', 'unresolved', 'escalated'\n"
+                "4. 'next_steps': A list of 1-3 recommended next steps for the support team\n"
+                "Return ONLY the JSON, no extra text."
+            )
+            
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
+            
+            import json
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"[GeminiService] Transcript Summarization Error: {e}")
+            return {
+                "summary": "Error generating summary.",
+                "key_issues": [],
+                "resolution_status": "unknown",
+                "next_steps": []
+            }

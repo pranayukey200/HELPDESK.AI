@@ -452,6 +452,9 @@ class BugReportAnalysisRequest(BaseModel):
 class BugReportAnalysisResponse(BaseModel):
     probable_cause: str
 
+class TranscriptSummarizeRequest(BaseModel):
+    messages: list[dict]
+
 @app.post("/ai/analyze_bug", response_model=BugReportAnalysisResponse)
 async def analyze_bug(request: BugReportAnalysisRequest):
     """Analyze a bug report using Gemini to generate a Probable Cause."""
@@ -467,6 +470,31 @@ async def analyze_bug(request: BugReportAnalysisRequest):
         request.console_errors
     )
     return BugReportAnalysisResponse(probable_cause=cause)
+
+@app.post("/ai/summarize_transcript")
+async def summarize_transcript(request: TranscriptSummarizeRequest):
+    """Summarize a support ticket conversation transcript."""
+    if not gemini_service or not gemini_service._initialized:
+        return {
+            "status": "error",
+            "message": "Transcript summarization unavailable (API key missing)",
+            "data": None
+        }
+
+    try:
+        summary_data = gemini_service.summarize_transcript(request.messages)
+        return {
+            "status": "success",
+            "message": "Transcript summarized successfully",
+            "data": summary_data
+        }
+    except Exception as e:
+        print(f"[Transcript Summarization Error]: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "data": None
+        }
 
 
 # ---------------------------------------------------------------------------
