@@ -825,7 +825,7 @@ async def analyze_only(request_body: TicketRequest):
     # --- RAG Knowledge Base Check ---
     rag_match = None
     try:
-        rag_match = rag_service.search_knowledge_base(text, threshold=0.85)
+        rag_match = rag_service.search_knowledge_base(text, threshold=0.6)
         if rag_match:
             classification["auto_resolve"] = True
             classification["assigned_team"] = "Auto-Resolve AI"
@@ -982,7 +982,7 @@ async def analyze_stream(request_body: TicketRequest):
         await asyncio.sleep(0.2)
         rag_match = None
         try:
-            rag_match = rag_service.search_knowledge_base(text, threshold=0.85)
+            rag_match = rag_service.search_knowledge_base(text, threshold=0.6)
             if rag_match:
                 classification["auto_resolve"] = True
                 classification["assigned_team"] = "Auto-Resolve AI"
