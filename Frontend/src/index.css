@@ -93,12 +93,25 @@
 
 html{
   overflow-y: scroll;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #618975 #f6f8f7; /* Firefox: thumb, track */
 }
 
 html::-webkit-scrollbar{
-  width: 0;
-  height: 0;
+  width: 8px;
+}
+
+html::-webkit-scrollbar-track{
+  background: #f6f8f7;
+}
+
+html::-webkit-scrollbar-thumb{
+  background: #618975;
+  border-radius: 10px;
+}
+
+html::-webkit-scrollbar-thumb:hover{
+  background: #4a6a5a;
 }
 
 body{
