@@ -40,6 +40,7 @@ class NotificationType(str, Enum):
     TICKET_ALERT = "ticket_alert"
     ADMIN_ALERT = "admin_alert"
     PUSH_NOTIFICATION = "push_notification"
+    PRE_CLOSURE_WARNING = "pre_closure_warning"
 
 
 class NotificationRoutingMiddleware:

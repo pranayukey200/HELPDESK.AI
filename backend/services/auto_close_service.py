@@ -18,6 +18,8 @@ from typing import Optional, Dict, List
 from supabase import create_client
 from dotenv import load_dotenv
 
+from backend.services import notification_routing
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,7 @@ class AutoCloseService:
         )
         self.enabled = os.getenv("AUTO_CLOSE_ENABLED", "true").lower() == "true"
         self.default_auto_close_days = int(os.getenv("AUTO_CLOSE_DAYS", "7"))
+        self.default_warning_before_close_hours = int(os.getenv("WARNING_BEFORE_CLOSE_HOURS", "24"))
         self.cron_schedule = os.getenv("AUTO_CLOSE_CRON_SCHEDULE", "0 2 * * *")  # 2 AM UTC daily
 
     def get_system_settings(self, company_id: str) -> Dict:
@@ -50,18 +53,19 @@ class AutoCloseService:
             company_id: UUID of the company
             
         Returns:
-            Dict with auto_close_days and auto_close_enabled settings.
+            Dict with auto_close_days, auto_close_enabled, and warning_before_close_hours settings.
             Falls back to defaults if system_settings not found.
         """
         try:
             response = self.supabase.table("system_settings").select(
-                "auto_close_days, auto_close_enabled"
+                "auto_close_days, auto_close_enabled, warning_before_close_hours"
             ).eq("company_id", company_id).single().execute()
             
             if response.data:
                 return {
                     "auto_close_days": response.data.get("auto_close_days", self.default_auto_close_days),
-                    "auto_close_enabled": response.data.get("auto_close_enabled", True)
+                    "auto_close_enabled": response.data.get("auto_close_enabled", True),
+                    "warning_before_close_hours": response.data.get("warning_before_close_hours", self.default_warning_before_close_hours)
                 }
         except Exception as e:
             logger.warning(f"Could not fetch settings for company {company_id}: {str(e)}. Using defaults.")
@@ -69,7 +73,8 @@ class AutoCloseService:
         # Fall back to defaults
         return {
             "auto_close_days": self.default_auto_close_days,
-            "auto_close_enabled": True
+            "auto_close_enabled": True,
+            "warning_before_close_hours": self.default_warning_before_close_hours
         }
 
 # NOTE: Method renamed to `get_system_settings` to match schema; underlying DB table is `system_settings`.
@@ -101,6 +106,66 @@ class AutoCloseService:
             logger.error(f"Failed to close ticket {ticket_id}: {str(e)}")
             return False
 
+    def _send_pre_closure_notification(self, ticket_id: str, company_id: str, warning_hours: int, stats: Dict) -> bool:
+        """
+        Send pre-closure notification to ticket requester and mark notification as sent.
+        
+        Args:
+            ticket_id: UUID of ticket
+            company_id: UUID of company
+            warning_hours: Hours until auto-close
+            stats: Statistics dict
+            
+        Returns:
+            True if notification sent, False otherwise
+        """
+        try:
+            # Check if notifications are enabled for this company
+            routing = notification_routing.get_instance()
+            if not routing:
+                routing = notification_routing.load()
+            if not routing.should_send_email_notification(company_id, notification_routing.NotificationType.PRE_CLOSURE_WARNING):
+                logger.info(f"Pre-closure notification skipped for ticket {ticket_id}: notifications disabled")
+                stats["skipped_count"] += 1
+                return False
+
+            # First, fetch ticket details to get requester
+            ticket = self.supabase.table("tickets").select("id, title, user_id, user_email").eq("id", ticket_id).eq("company_id", company_id).single().execute()
+            if not ticket.data:
+                logger.warning(f"Ticket {ticket_id} not found, cannot send notification")
+                stats["error_count"] +=1
+                return False
+
+            ticket_data = ticket.data
+
+            # Now, create notification record (assuming there's a notifications table; if not, log it)
+            try:
+                self.supabase.table("notifications").insert({
+                    "ticket_id": ticket_id,
+                    "company_id": company_id,
+                    "user_id": ticket_data.get("user_id"),
+                    "type": "pre_closure_warning",
+                    "title": "Your ticket is about to be closed",
+                    "message": f"Your ticket \"{ticket_data.get('title', 'Untitled')}\" will be automatically closed in {warning_hours} hours if no action is taken. Please reply if you still need assistance.",
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }).execute()
+            except Exception as e:
+                logger.warning(f"Could not insert into notifications table: {e}. Continuing with just marking the ticket.")
+
+            # Mark ticket as having had pre-closure notification sent
+            self.supabase.table("tickets").update({
+                "pre_closure_notification_sent": True,
+                "pre_closure_notification_sent_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", ticket_id).eq("company_id", company_id).execute()
+
+            stats["notifications_sent_count"] +=1
+            logger.info(f"Sent pre-closure notification for ticket {ticket_id}")
+            return True
+        except Exception as e:
+            stats["error_count"] +=1
+            logger.error(f"Failed to send pre-closure notification for ticket {ticket_id}: {str(e)}")
+            return False
+
     def run(self) -> Dict:
         """
         Execute the auto-close job.
@@ -109,8 +174,9 @@ class AutoCloseService:
         1. Fetch all resolved tickets
         2. Group by company_id
         3. For each company, check auto-close settings
-        4. Close tickets older than auto_close_days
-        5. Log results and return statistics
+        4. Send pre-closure warnings for tickets in warning window
+        5. Close tickets older than auto_close_days
+        6. Log results and return statistics
         
         Returns:
             Dict with statistics on processed/closed/error tickets
@@ -123,7 +189,8 @@ class AutoCloseService:
             "processed_count": 0,
             "closed_count": 0,
             "error_count": 0,
-            "skipped_count": 0
+            "skipped_count": 0,
+            "notifications_sent_count": 0
         }
 
         try:
@@ -131,7 +198,7 @@ class AutoCloseService:
 
             # Fetch all resolved tickets
             response = self.supabase.table("tickets").select(
-                "id, company_id, status, updated_at"
+                "id, company_id, status, updated_at, pre_closure_notification_sent"
             ).eq("status", "resolved").execute()
 
             resolved_tickets = response.data if response.data else []
@@ -157,21 +224,30 @@ class AutoCloseService:
                         continue
 
                     auto_close_days = settings["auto_close_days"]
-                    cutoff_date = datetime.now(timezone.utc) - timedelta(days=auto_close_days)
+                    warning_hours = settings["warning_before_close_hours"]
+                    
+                    now = datetime.now(timezone.utc)
+                    cutoff_date = now - timedelta(days=auto_close_days)
+                    warning_start_date = now - timedelta(days=auto_close_days) + timedelta(hours=warning_hours)
 
-                    # Filter tickets older than cutoff
+                    # Process each ticket
                     for ticket in tickets:
                         try:
                             updated_at_str = ticket.get("updated_at")
                             if not updated_at_str:
                                 logger.warning(f"Ticket {ticket['id']} missing updated_at, skipping")
+                                stats["skipped_count"] += 1
                                 continue
 
                             # Parse ISO format timestamp
                             updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
 
+                            # First check if ticket should be closed
                             if updated_at < cutoff_date:
                                 self._close_ticket(ticket["id"], company_id, stats)
+                            # Check if ticket is in warning window and hasn't had notification sent yet
+                            elif updated_at < warning_start_date and not ticket.get("pre_closure_notification_sent", False):
+                                self._send_pre_closure_notification(ticket["id"], company_id, warning_hours, stats)
                             else:
                                 stats["skipped_count"] += 1
 
@@ -185,6 +261,7 @@ class AutoCloseService:
 
             logger.info(
                 f"Auto-close job completed. Closed: {stats['closed_count']}, "
+                f"Notifications: {stats['notifications_sent_count']}, "
                 f"Skipped: {stats['skipped_count']}, Errors: {stats['error_count']}"
             )
             return stats
