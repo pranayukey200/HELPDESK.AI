@@ -211,6 +211,14 @@ try:
 except ImportError:
     ocr_service = None
 
+# SLA Notification Service
+sla_svc = None
+try:
+    from backend.services import sla_notification_service
+    sla_svc = sla_notification_service.load()
+except Exception as e:
+    print(f"[WARNING] SLA Notification Service failed to load: {e}")
+
 
 # ---------------------------------------------------------------------------
 # Lifespan (startup / shutdown)
