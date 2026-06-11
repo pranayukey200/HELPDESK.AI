@@ -171,7 +171,7 @@ ${fullName}`;
                         How can we help you today?
                     </h1>
                     <p className="text-lg text-emerald-100 max-w-2xl mx-auto font-medium opacity-90 mb-10">
-                        Search our **Solution Library**, watch curated IT tutorials, or connect with a support agent instantly.
+                        Search our <strong>Solution Library</strong>, watch curated IT tutorials, or connect with a support agent instantly.
                     </p>
 
                     {/* Faux Search Bar representing the Hub */}
