@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, CheckCircle2, X, Loader2, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -17,6 +17,21 @@ export default function CSATModal({ ticketId, onSubmit, onDismiss }) {
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Handle Escape key to close modal
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onDismiss();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onDismiss]);
 
     const ratingLabels = {
         1: 'Very Dissatisfied',

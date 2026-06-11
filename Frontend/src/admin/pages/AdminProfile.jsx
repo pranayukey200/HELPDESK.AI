@@ -62,6 +62,23 @@ const AdminProfile = () => {
         fetchActivity();
     }, [adminProfile?.company]);
 
+    // Handle Escape key to close password modal
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && showPasswordModal) {
+                setShowPasswordModal(false);
+            }
+        };
+
+        if (showPasswordModal) {
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [showPasswordModal]);
+
     const handleImageUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;

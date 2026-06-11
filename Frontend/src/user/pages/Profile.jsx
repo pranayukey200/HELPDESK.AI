@@ -66,6 +66,23 @@ const Profile = () => {
         }
     }, [profile]);
 
+    // Handle Escape key to close password modal
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && showPasswordModal) {
+                setShowPasswordModal(false);
+            }
+        };
+
+        if (showPasswordModal) {
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [showPasswordModal]);
+
     useEffect(() => {
         const fetchUserTickets = async () => {
             if (!user?.id) return;
