@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Clock, ExternalLink } from 'lucide-react';
 import { formatTimelineDate } from '../../utils/dateUtils';
+import { TicketTableSkeleton } from '../../components/Skeleton';
 
 const categoryDotColors = {
     'Hardware': '#f97316',
@@ -37,12 +38,7 @@ const TicketTable = ({ tickets = [], isLoading = false, limit = null }) => {
 
     const displayTickets = limit ? tickets.slice(0, limit) : tickets;
 
-    if (isLoading) return (
-        <div className="py-24 text-center">
-            <div style={{ width: 40, height: 40, border: '3px solid #16a34a', borderTopColor: 'transparent', borderRadius: '50%' }} className="animate-spin mx-auto mb-4"></div>
-            <p style={{ color: '#9ca3af', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Synchronizing System Data...</p>
-        </div>
-    );
+    if (isLoading) return <TicketTableSkeleton count={limit || 10} />;
 
     if (displayTickets.length === 0) return (
         <div className="py-24 text-center" style={{ border: '2px dashed #e5e7eb', borderRadius: '16px', margin: '16px' }}>
