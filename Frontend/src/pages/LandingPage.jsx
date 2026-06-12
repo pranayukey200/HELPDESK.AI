@@ -13,48 +13,7 @@ import {
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import TeamSection from '../components/landing/TeamSection';
-
-// ---- Count-up animation component ----
-function AnimatedStat({ target, suffix = '', prefix = '', label, isWord = false }) {
-    const [display, setDisplay] = useState(isWord ? target : '0');
-    const [triggered, setTriggered] = useState(false);
-    const ref = useRef(null);
-
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        const observer = new IntersectionObserver(
-            ([entry]) => { if (entry.isIntersecting && !triggered) setTriggered(true); },
-            { threshold: 0.5 }
-        );
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [triggered]);
-
-    useEffect(() => {
-        if (!triggered || isWord) return;
-        const duration = 1500;
-        const start = performance.now();
-        const to = parseFloat(target);
-        const step = (now) => {
-            const progress = Math.min((now - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            const current = Math.round((to) * eased);
-            setDisplay(String(current));
-            if (progress < 1) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-    }, [triggered, target, isWord]);
-
-    return (
-        <div ref={ref} className="p-4">
-            <div className="text-4xl font-extrabold mb-1 text-white tabular-nums">
-                {prefix}{display}{suffix}
-            </div>
-            <div className="text-sm text-white font-medium tracking-wide opacity-75">{label}</div>
-        </div>
-    );
-}
+import AnimatedCounter from '../components/AnimatedCounter';
 
 // ---- Demo Modal ----
 function DemoModal({ onClose }) {
@@ -500,10 +459,10 @@ export default function LandingPage() {
             <section className="bg-emerald-900 py-12 text-white">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center divide-y-2 sm:divide-y-0 sm:divide-x divide-white/10">
-                        <AnimatedStat prefix="+" target="80" suffix="%" label="Faster Ticket Triage" />
-                        <AnimatedStat target="99" suffix="%" label="Classification Accuracy" />
-                        <AnimatedStat target="Zero" label="Manual Routing Needed" isWord={true} />
-                        <AnimatedStat target="24" suffix="/7" label="AI Auto-Resolution" />
+                        <AnimatedCounter prefix="+" target="80" suffix="%" label="Faster Ticket Triage" />
+                        <AnimatedCounter target="99" suffix="%" label="Classification Accuracy" />
+                        <AnimatedCounter target="Zero" label="Manual Routing Needed" isWord={true} />
+                        <AnimatedCounter target="24" suffix="/7" label="AI Auto-Resolution" />
                     </div>
                 </div>
             </section>
