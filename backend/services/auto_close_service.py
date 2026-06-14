@@ -36,7 +36,7 @@ class AutoCloseService:
         """Initialize the auto-close service with Supabase client."""
         self.supabase = create_client(
             os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         )
         self.enabled = os.getenv("AUTO_CLOSE_ENABLED", "true").lower() == "true"
         self.default_auto_close_days = int(os.getenv("AUTO_CLOSE_DAYS", "7"))
