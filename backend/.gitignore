@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs and data
+*.log
+data/low_confidence_log.json
+user_feedback_rows.csv
